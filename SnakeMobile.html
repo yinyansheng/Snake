@@ -1,0 +1,329 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+
+<link rel="stylesheet" href="http://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.css">
+<script src="http://code.jquery.com/jquery-1.8.3.min.js"></script>
+<script src="http://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.js"></script>
+
+<script type="text/javascript" src="http://www.163css.com/myweb/hihilinxuan/template/hihilinxuan/cssjs/2012/12/ifengtouch/js/jquery.min.js"></script>
+<script type="text/javascript" src="http://www.163css.com/myweb/hihilinxuan/template/hihilinxuan/cssjs/2012/12/ifengtouch/js/jquery.touchSwipe.min.js"></script>
+<script type="text/javascript" src="LinkList.js"></script>
+
+<script>
+
+    var mapheightnum;        //地图高度格数
+    var mapwidthnum;       //地图宽度格数
+    var snakebody = new LinkedList();//描述蛇身体的列表
+    var snakedir;                    //蛇头方向
+    var tidck;                       //时间定时对象
+    var snakespeed = 200;              //蛇的速度
+    var IsFood = false;                //是否吃到食物（只读）
+    var IsWall = true;                 //是否可以穿墙
+
+    $(function () {
+        $(window).bind("orientationchange resize pageshow", function () {
+            InitGame();
+        });
+    });
+
+
+    function InitGame() {
+        clearInterval(tidck);
+        var viewport_height = $(window).height();
+        var content_height = viewport_height - $('#header').outerHeight() - $('#footer').outerHeight();
+        $('#mainpanel').height(content_height - 10);
+
+        InitMap($('#mainpanel').width(), $('#mainpanel').height());
+        InitSnake(Math.floor(mapheightnum / 2));
+        PaintSnake(snakebody);
+        ProductFood();
+        setActionEvent();
+    }
+
+
+    function setActionEvent() {
+        $('#btnAction').click(function () {
+            //$('#btnAction').val('ttt');
+            if (tidck == null) {
+                StartGame();
+            } else {
+                PauseGame(tidck);
+            }
+        });
+    }
+
+    function StartGame() {
+        clearInterval(tidck);
+        tidck = window.setInterval(function () {
+
+            //移动蛇
+            MoveSnake(snakebody, snakedir);
+
+            //判定蛇是否死了
+            if (IsDead(snakebody)) {
+                alert("fail!");
+                InitGame();
+                return false;
+            }
+            //画蛇
+            PaintSnake(snakebody);
+            //判定蛇是否吃到食物
+            IsFood = ($(".food").attr("id") == snakebody.get(0).x + "_" + snakebody.get(0).y);
+            if (IsFood) {
+                $('#score').text("[score:" + (snakebody.length + 1) + "]");
+                ProductFood();
+            }
+        }, snakespeed);
+    }
+
+    //蛇移动
+    function MoveSnake(snakebody, snakedir) {
+        switch (snakedir) {
+            case "right":
+                snakebody.addFirst({ x: snakebody.get(0).x + 1, y: snakebody.get(0).y });
+                if (IsWall) {
+                    if (snakebody.get(0).x >= mapwidthnum) {
+                        snakebody.get(0).x = snakebody.get(0).x - mapwidthnum;
+                    }
+                }
+                IsEatFood();
+                break
+            case "left":
+                snakebody.addFirst({ x: snakebody.get(0).x - 1, y: snakebody.get(0).y });
+                if (IsWall) {
+                    if (snakebody.get(0).x < 0) {
+                        snakebody.get(0).x = snakebody.get(0).x + mapwidthnum;
+                    }
+                }
+                IsEatFood();
+                break
+            case "down":
+                snakebody.addFirst({ x: snakebody.get(0).x, y: snakebody.get(0).y + 1 });
+                if (IsWall) {
+                    if (snakebody.get(0).y >= mapheightnum) {
+                        snakebody.get(0).y = snakebody.get(0).y - mapheightnum;
+                    }
+                }
+                IsEatFood();
+                break
+            case "up":
+                snakebody.addFirst({ x: snakebody.get(0).x, y: snakebody.get(0).y - 1 });
+                if (IsWall) {
+                    if (snakebody.get(0).y < 0) {
+                        snakebody.get(0).y = snakebody.get(0).y + mapheightnum;
+                    }
+                }
+                IsEatFood();
+                break
+            default:
+                //do nothing;
+        }
+    }
+
+    //判定蛇是否死了
+    function IsDead(snakebody) {
+        //碰到自己
+        if (ContainsBody(snakebody, snakebody.get(0))) {
+            return true;
+        }
+        //碰到墙
+        if (snakebody.get(0).x >= mapwidthnum || snakebody.get(0).x < 0 || snakebody.get(0).y >= mapheightnum || snakebody.get(0).y < 0) {
+            return true;
+        }
+        return false;
+    }
+
+    //判定是否吃到食物
+    function IsEatFood() {
+        if (!IsFood) {
+            snakebody.remove(snakebody.get(snakebody.size() - 1));
+            //$("#sankelegth").text(snakebody.size());
+            $(".sankelegth").text(snakebody.size());
+        }
+    }
+
+
+    //蛇头是否碰到蛇身体链表中
+    function ContainsBody(snakebody, food) {
+        for (var i = 1; i < snakebody.size() ; i++) {
+            if (snakebody.get(i).x == food.x && snakebody.get(i).y == food.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    //生产一个食物
+    function ProductFood() {
+        var foodY = randNum(1, mapheightnum - 2);
+        var foodX = randNum(1, mapwidthnum - 2);
+
+        while (Contains(snakebody, { x: foodX, y: foodY })) {
+            foodY = randNum(1, mapheightnum - 2);
+            foodX = randNum(1, mapwidthnum - 2);
+        }
+        $("td").removeClass("food");
+        $("#" + foodX + "_" + foodY).addClass("food");
+    }
+
+    //是否在蛇身体链表中
+    function Contains(snakebody, food) {
+        for (var i = 0; i < snakebody.size() ; i++) {
+            if (snakebody.get(i).x == food.x && snakebody.get(i).y == food.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function randNum(under, over) {
+        switch (arguments.length) {
+            case 1: return parseInt(Math.random() * under + 1) - 1;
+            case 2: return parseInt(Math.random() * (over - under + 1) + under);
+            default: return 0;
+        }
+    }
+
+
+    //画蛇在页面上
+    function PaintSnake(snakebody) {
+        $("td").removeClass("snakebody");
+        for (var i = 0; i < snakebody.size() ; i++) {
+            $("#" + snakebody.get(i).x + "_" + snakebody.get(i).y).addClass("snakebody");
+        }
+    }
+
+    //初始化蛇
+    function InitSnake(vY) {
+        snakebody = new LinkedList();
+        snakebody.addLast({ x: 3, y: vY });
+        snakebody.addLast({ x: 2, y: vY });
+        snakebody.addLast({ x: 1, y: vY });
+        snakebody.addLast({ x: 0, y: vY });
+        snakedir = "right";
+    }
+
+
+
+    function InitMap(mapWidth, mapHeigth) {
+
+        mapwidthnum = Math.floor(mapWidth / 18);        //地图高度格数
+        mapheightnum = Math.floor(mapHeigth / 18);       //地图宽度格数
+
+        //在页面上画地图
+        $("#mainpanel").html("");
+        $("#mainpanel").append(CreateMap(mapheightnum, mapwidthnum));
+        function CreateMap(mapheightnum, mapwidthnum) {
+            var strtab = "<table id='maintable' cellspacing='0'>"
+            for (var i = 0; i < mapheightnum; i++) {
+                strtab += "<tr>"
+                for (var j = 0; j < mapwidthnum; j++) {
+                    var id = j + "_" + i;
+                    strtab += "<td id='" + id + "'></td>"
+                }
+                strtab += "</tr>"
+            }
+            strtab += "</table>"
+            return strtab;
+        }
+    }
+
+    /*暂停游戏*/
+    function PauseGame() {
+        clearInterval(tidck);
+        tidck = null;
+    }
+
+
+    $(function () {
+        //swipe 的dome
+        $("#mainpanel").swipe({
+            swipe: function (event, direction, distance, duration, fingerCount) {
+                //$(this).text("你用"+fingerCount+"个手指以"+duration+"秒的速度向" + direction + "滑动了" +distance+ "像素 " );
+                switch (direction) {
+                    case "up":
+                        if (snakedir != "down" && snakedir != "up") { snakedir = "up"; }
+                        break
+                    case "down":
+                        if (snakedir != "up" && snakedir != "down") { snakedir = "down"; }
+                        break
+                    case "left":
+                        if (snakedir != "right" && snakedir != "left") { snakedir = "left"; }
+                        break
+                    case "right":
+                        if (snakedir != "left" && snakedir != "right") { snakedir = "right"; }
+                        break
+                    default:
+                        //do nothing;
+                }
+            }
+        });
+    });
+
+
+
+
+</script>
+
+<style type="text/css">
+    /*主div样式*/
+    #mainpanel {
+    }
+
+    #maintable {
+        border-bottom: solid 2px gray;
+        border-right: solid 2px gray;
+        border-left: solid 1px gray;
+        border-top: solid 1px gray;
+    }
+
+        /*主表格单元格样式*/
+        #maintable tr td {
+            border-top: solid 1px gray;
+            border-left: solid 1px gray;
+            width: 15px;
+            height: 15px;
+        }
+
+    /*蛇身样式*/
+    .snakebody {
+        background: green;
+    }
+
+    /*食物样式*/
+    .food {
+        background: #5280A8;
+    }
+</style>
+
+
+</head>
+<body>
+
+    <div data-role="page" id="pageone">
+        <div data-role="header" id="header">
+            <h1>Snake&nbsp;<span id="score" style="font-size:small"></span></h1>
+        </div>
+
+        <div data-role="content" style="margin:0px;padding:0px;" id="content">
+            <center>
+                <div id="mainpanel">
+                </div>
+            </center>
+        </div>
+
+        <div data-role="footer" class="ui-btn" style="margin:0px;padding:0px" id="footer">
+            <input type="button" id="btnAction" value="Start/Pause" />
+            <!--<input type="button" id="btnConfig" value="Configuration"/>-->
+        </div>
+
+
+
+    </div>
+</body>
+</html>
